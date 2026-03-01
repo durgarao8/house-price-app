@@ -1,71 +1,44 @@
 import streamlit as st
-import joblib
-import numpy as np
 import pandas as pd
-
-# Load model and scaler
-model = joblib.load("house_price_model.pkl")
-scaler = joblib.load("scaler.pkl")
+import numpy as np
+from sklearn.datasets import fetch_california_housing
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
 
 st.title("🏠 California House Price Prediction")
 
-# -------------------------
+@st.cache_resource
+def train_model():
+    data = fetch_california_housing(as_frame=True)
+    df = data.frame
+
+    X = df.drop("MedHouseVal", axis=1)
+    y = df["MedHouseVal"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    model = RandomForestRegressor(n_estimators=50, random_state=42)
+    model.fit(X_train, y_train)
+
+    return model
+
+model = train_model()
+
 # User Inputs
-# -------------------------
+MedInc = st.number_input("Median Income", value=3.5)
+HouseAge = st.number_input("House Age", value=20.0)
+AveRooms = st.number_input("Average Rooms", value=5.0)
+AveBedrms = st.number_input("Average Bedrooms", value=1.0)
+Population = st.number_input("Population", value=1000.0)
+AveOccup = st.number_input("Average Occupancy", value=3.0)
+Latitude = st.number_input("Latitude", value=37.0)
+Longitude = st.number_input("Longitude", value=-122.0)
 
-longitude = st.number_input("Longitude", value=-122.23)
-latitude = st.number_input("Latitude", value=37.88)
-housing_median_age = st.number_input("Housing Median Age", value=20)
-total_rooms = st.number_input("Total Rooms", value=1000)
-total_bedrooms = st.number_input("Total Bedrooms", value=200)
-population = st.number_input("Population", value=800)
-households = st.number_input("Households", value=300)
-median_income = st.number_input("Median Income", value=3.5)
+if st.button("Predict"):
+    input_data = np.array([[MedInc, HouseAge, AveRooms, AveBedrms,
+                            Population, AveOccup, Latitude, Longitude]])
 
-ocean_proximity = st.selectbox(
-    "Ocean Proximity",
-    ["<1H OCEAN", "INLAND", "ISLAND", "NEAR BAY", "NEAR OCEAN"]
-)
-
-# -------------------------
-# Prediction
-# -------------------------
-
-if st.button("Predict Price"):
-
-    # Feature engineering
-    rooms_per_household = total_rooms / households if households != 0 else 0
-
-    # Create dictionary with all features
-    input_dict = {
-        "longitude": longitude,
-        "latitude": latitude,
-        "housing_median_age": housing_median_age,
-        "total_rooms": total_rooms,
-        "total_bedrooms": total_bedrooms,
-        "population": population,
-        "households": households,
-        "median_income": median_income,
-        "rooms_per_household": rooms_per_household,
-
-        # All ocean columns start as 0
-        "ocean_proximity_<1H OCEAN": 0,
-        "ocean_proximity_INLAND": 0,
-        "ocean_proximity_ISLAND": 0,
-        "ocean_proximity_NEAR BAY": 0,
-        "ocean_proximity_NEAR OCEAN": 0
-    }
-
-    # Set selected ocean proximity to 1
-    input_dict[f"ocean_proximity_{ocean_proximity}"] = 1
-
-    # Convert to DataFrame
-    input_df = pd.DataFrame([input_dict])
-
-    # Scale
-    input_scaled = scaler.transform(input_df)
-
-    # Predict
-    prediction = model.predict(input_scaled)
-
-    st.success(f"🏡 Predicted House Price: ${prediction[0]:,.2f}")
+    prediction = model.predict(input_data)
+    st.success(f"Predicted House Value: ${prediction[0]*100000:,.2f}")
